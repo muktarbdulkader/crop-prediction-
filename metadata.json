@@ -1,0 +1,5 @@
+{
+  "name": "agricultural assistant",
+  "description": "An intelligent system that leverages AI to predict crops, answer agricultural questions, and analyze plant images. Users can get crop recommendations, chat with an AgriBot, or scan plant leaves for potential issues.",
+  "requestFramePermissions": ["camera", "geolocation", "microphone"]
+}

@@ -1,0 +1,168 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Crop Yield Prediction System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'brand-green': {
+                light: '#a3e635', // lime-400
+                DEFAULT: '#65a30d', // lime-600
+                dark: '#3f6212',  // lime-800
+              },
+              'brand-brown': {
+                light: '#f59e0b', // amber-500
+                DEFAULT: '#b45309', // amber-700
+              },
+              'brand-bg': '#f7fee7', // lime-50
+              'base': {
+                  100: '#f9fafb', // gray-50
+                  200: '#f3f4f6', // gray-100
+                  300: '#e5e7eb', // gray-200
+                  400: '#d1d5db', // gray-300
+              },
+              'text-main': '#1f2937', // gray-800
+              'text-muted': '#6b7280', // gray-500
+              'card': '#ffffff',
+            },
+            keyframes: {
+              'fade-in': {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+               'bounce-subtle': {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-4px)' },
+              },
+              'pulse-gemini': {
+                '0%, 100%': { transform: 'scale(1)', opacity: '1' },
+                '50%': { transform: 'scale(1.1)', opacity: '0.7' },
+              }
+            },
+            animation: {
+              'fade-in': 'fade-in 0.5s ease-out forwards',
+              'bounce-subtle': 'bounce-subtle 1.5s ease-in-out infinite',
+              'pulse-gemini': 'pulse-gemini 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      .prose {
+        color: #374151; /* gray-700 */
+        line-height: 1.65;
+      }
+      .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+        color: #1f2937; /* gray-800 */
+        font-weight: 700;
+        margin-top: 1.25em;
+        margin-bottom: 0.5em;
+      }
+       .prose h2 { font-size: 1.5em; }
+       .prose h3 { font-size: 1.25em; }
+      .prose p {
+        margin-top: 0.75em;
+        margin-bottom: 0.75em;
+      }
+      .prose strong {
+        color: #1f2937; /* gray-800 */
+        font-weight: 600;
+      }
+      .prose ul, .prose ol {
+        margin-top: 0.75em;
+        margin-bottom: 0.75em;
+        padding-left: 1.5em;
+      }
+      .prose ul {
+        list-style-type: disc;
+      }
+      .prose ol {
+        list-style-type: decimal;
+      }
+       .prose li > p {
+        margin-top: 0;
+        margin-bottom: 0;
+      }
+      /* Modern Form Styles */
+      .form-input {
+        display: block;
+        width: 100%;
+        padding: 0.75rem;
+        font-size: 1rem;
+        line-height: 1.5;
+        color: #1f2937;
+        background-color: #f9fafb;
+        background-clip: padding-box;
+        border: 1px solid #d1d5db;
+        border-radius: 0.5rem;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+      }
+      .form-input:focus {
+        outline: none;
+        border-color: #65a30d;
+        box-shadow: 0 0 0 3px rgba(101, 163, 13, 0.2);
+      }
+      /* Custom Range Slider */
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 6px;
+        background: #e5e7eb;
+        border-radius: 5px;
+        outline: none;
+        opacity: 0.7;
+        transition: opacity .2s;
+      }
+      input[type="range"]:hover {
+        opacity: 1;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        background: #65a30d;
+        cursor: pointer;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        background: #65a30d;
+        cursor: pointer;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1",
+    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
+    "marked": "https://aistudiocdn.com/marked@^17.0.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-brand-bg font-sans text-text-main">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
