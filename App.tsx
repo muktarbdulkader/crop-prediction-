@@ -74,9 +74,12 @@ const App: React.FC = () => {
       savedTool === "scanner" ||
       savedTool === "soil_scanner" ||
       savedTool === "profile"
-      ? (savedTool as Tool)
+      ? savedTool
       : "predictor";
   });
+  const [pendingAgriBotPrompt, setPendingAgriBotPrompt] = useState<
+    string | null
+  >(null);
   const [language, setLanguage] = useState<Language>(() => {
     const savedLang = localStorage.getItem("preferredLanguage");
     return savedLang === "en" || savedLang === "am" || savedLang === "om"
@@ -119,25 +122,41 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAskAgriBot = (prompt: string) => {
+    setPendingAgriBotPrompt(prompt);
+    setActiveTool("chatbot");
+  };
+
+  const handlePromptSent = () => {
+    setPendingAgriBotPrompt(null);
+  };
+
   const renderTool = () => {
     if (!user) return null; // Should not happen if this function is called
 
     const props = { language, t };
     switch (activeTool) {
       case "predictor":
-        return <CropPredictor {...props} />;
+        return <CropPredictor {...props} onAskAgriBot={handleAskAgriBot} />;
       case "chatbot":
-        return <AgriBot {...props} />;
+        return (
+          <AgriBot
+            {...props}
+            initialPrompt={pendingAgriBotPrompt}
+            onPromptSent={handlePromptSent}
+          />
+        );
       case "scanner":
         return (
           <LeafScanner
             user={user}
             onNavigateToProfile={() => setActiveTool("profile")}
+            onAskAgriBot={handleAskAgriBot}
             {...props}
           />
         );
       case "soil_scanner":
-        return <SoilScanner {...props} />;
+        return <SoilScanner {...props} onAskAgriBot={handleAskAgriBot} />;
       case "profile":
         return (
           <UserProfile
