@@ -3,7 +3,7 @@ export const translations = {
     // General
     appName: 'Agri-AI Assistant',
     appSubtitle: 'Your all-in-one AI tool for crop prediction, agricultural queries, and plant health analysis.',
-    footer: 'Powered by Gemini AI. For educational and demonstration purposes only.',
+    footer: 'agricultor. — Empowering farmers with AI insights for better harvests.',
     language: 'Language',
     welcomeMessage: 'Welcome',
     logout: 'Logout',
@@ -294,7 +294,7 @@ export const translations = {
     // General
     appName: 'አግሪ-ኤአይ ረዳት',
     appSubtitle: 'ለሰብል ትንበያ፣ ለግብርና ጥያቄዎች እና ለተክል ጤና ትንተና ሁሉን-በአንድ የሆነ የኤአይ መሳሪያዎ።',
-    footer: 'በGemini AI የተጎላበተ። ለትምህርታዊ እና ለማሳያ ዓላማዎች ብቻ።',
+    footer: 'agricultor. — ከAI ጥቅም ጋር ከሚሻሉ መልኩ ግብርናን ለጥሩ መመርያ ማስቻል።',
     language: 'ቋንቋ',
     welcomeMessage: 'እንኳን ደህና መጡ',
     logout: 'ውጣ',
@@ -585,7 +585,7 @@ export const translations = {
     // General
     appName: 'Gargaaraa Agri-AI',
     appSubtitle: 'Meeshaa kee AI kan oomisha tilmaamuu, gaaffiiwwan qonnaa deebisuu, fi fayyaa biqiltuu xiinxaluuf gargaaru.',
-    footer: 'Humna Gemini AItiin kan hojjetame. Kaayyoo barumsaafi agarsiisaaf qofa.',
+    footer: 'agricultor. — Qonnaan bultootaaf gargaarsa bu’aa qabeessa argamsiisuuf AI waliin deeggaruu.',
     language: 'Afaan',
     welcomeMessage: 'Baga Nagaan Dhufte',
     logout: 'Bahi',
