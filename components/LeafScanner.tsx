@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { marked } from 'marked';
 import { analyzeLeaf, getTreatmentPlan, extractDiseaseName, generateDiseaseImage, getPlantGrowthStages } from '../services/geminiService';
@@ -7,12 +8,14 @@ import LoadingIndicator from './LoadingIndicator';
 import ExampleCarousel from './ExampleCarousel';
 import ScanHistory from './ScanHistory';
 import PlayAudioButton from './PlayAudioButton';
+import CameraCapture from './CameraCapture';
+import PaymentModal from './PaymentModal';
 
 interface LeafScannerProps {
     language: Language;
     t: any; // Translation object
     user: User;
-    onNavigateToProfile: () => void;
+    onUpgrade: () => void;
     onAskAgriBot: (prompt: string) => void;
 }
 
@@ -30,7 +33,7 @@ const urlToFile = async (url: string, filename: string, mimeType: string): Promi
     return new File([blob], filename, { type: mimeType });
 };
 
-const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigateToProfile, onAskAgriBot }) => {
+const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onUpgrade, onAskAgriBot }) => {
     const [image, setImage] = useState<{ file: File; dataUrl: string } | null>(null);
     const [plantName, setPlantName] = useState('');
     const [prompt, setPrompt] = useState('');
@@ -50,11 +53,12 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
     const [rawTreatmentPlan, setRawTreatmentPlan] = useState<string | null>(null);
     const [isTreatmentLoading, setIsTreatmentLoading] = useState(false);
     const [treatmentError, setTreatmentError] = useState<string | null>(null);
-    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [imageGenError, setImageGenError] = useState<string | null>(null);
     const [showProTooltip, setShowProTooltip] = useState(false);
+    const justUpgradedRef = useRef(false);
 
     // Growth Stages State
     const [growthStages, setGrowthStages] = useState<string | null>(null);
@@ -77,13 +81,18 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
     const [activeScanId, setActiveScanId] = useState<string | null>(null);
     const [showPromptInput, setShowPromptInput] = useState(false);
 
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const streamRef = useRef<MediaStream | null>(null);
-
     useEffect(() => {
         setPrompt(t.scanner?.defaultPrompt || 'Analyze this leaf image for any signs of disease.');
     }, [t.scanner?.defaultPrompt, language]);
     
+    // Effect to auto-trigger Pro features after a successful upgrade
+    useEffect(() => {
+        if (user.plan === 'pro' && justUpgradedRef.current) {
+            justUpgradedRef.current = false; // Reset the flag
+            handleGetTreatment(); // This will now succeed
+        }
+    }, [user.plan]);
+
     useEffect(() => {
         const generateProFeatures = async () => {
             if (!analysis?.raw || !plantName) return;
@@ -136,15 +145,9 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
         generateProFeatures();
     }, [analysis, user.plan, plantName, language, t.errors]);
 
-    useEffect(() => {
-        if (isCameraOpen && streamRef.current && videoRef.current) {
-            videoRef.current.srcObject = streamRef.current;
-        }
-    }, [isCameraOpen]);
-
-    const handleFileChange = async (files: FileList | null) => {
-        if (files && files[0]) {
-            const file = files[0];
+    const handleFileChange = async (files: FileList | File | null) => {
+        const file = files instanceof FileList ? files[0] : files;
+        if (file) {
             if (file.type.startsWith('image/')) {
                 const dataUrl = await fileToBase64(file);
                 setImage({ file, dataUrl });
@@ -175,51 +178,15 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
         }
     };
     
-    const openCamera = async (e: React.MouseEvent) => {
+    const openCamera = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                streamRef.current = stream;
-                setIsCameraOpen(true);
-            } catch (err) {
-                console.error("Error accessing camera:", err);
-                setError(t.errors.CAMERA_ERROR);
-            }
-        } else {
-            setError(t.errors.CAMERA_UNSUPPORTED);
-        }
+        setIsCameraOpen(true);
     };
 
-    const closeCamera = () => {
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-        }
-        setIsCameraOpen(false);
-        streamRef.current = null;
-    };
-
-    const capturePhoto = () => {
-        const video = videoRef.current;
-        if (video) {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const context = canvas.getContext('2d');
-            if (context) {
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                canvas.toBlob((blob) => {
-                    if (blob) {
-                        const file = new File([blob], "camera-capture.jpg", { type: "image/jpeg" });
-                        const dataTransfer = new DataTransfer();
-                        dataTransfer.items.add(file);
-                        handleFileChange(dataTransfer.files);
-                    }
-                    closeCamera();
-                }, 'image/jpeg');
-            }
-        }
+    const handleCapture = (file: File) => {
+        handleFileChange(file);
+        setIsCameraOpen(false); // The capture component will close itself, but we ensure state consistency
     };
 
     const handleSubmit = async () => {
@@ -301,7 +268,8 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
     const handleGetTreatment = async () => {
         if (!analysis?.raw) return;
         if (user.plan === 'free') {
-            setShowUpgradeModal(true);
+            justUpgradedRef.current = true;
+            setIsPaymentModalOpen(true);
             return;
         }
         setIsTreatmentLoading(true);
@@ -331,7 +299,13 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
         } finally {
             setIsTreatmentLoading(false);
         }
-    }
+    };
+
+    const handlePaymentSuccess = () => {
+        onUpgrade();
+        setIsPaymentModalOpen(false);
+        // The useEffect on user.plan will trigger the retry
+    };
 
     const handleResetScanner = (clearImage: boolean = true) => {
         if (clearImage) setImage(null);
@@ -394,46 +368,6 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
         }
     };
     
-    const UpgradeModal = () => (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowUpgradeModal(false)}>
-            <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full text-center relative" onClick={(e) => e.stopPropagation()}>
-                <h3 className="text-xl font-bold text-brand-green-dark">{t.upgradeModal.title}</h3>
-                <p className="my-4 text-gray-600">{t.upgradeModal.body}</p>
-                <div className="flex flex-col sm:flex-row gap-2 mt-6">
-                    <button onClick={onNavigateToProfile} className="w-full bg-brand-green hover:bg-brand-green-dark text-white font-bold py-3 px-4 rounded-lg transition-colors">
-                        {t.upgradeModal.actionButton}
-                    </button>
-                    <button onClick={() => setShowUpgradeModal(false)} className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-4 rounded-lg transition-colors">
-                        {t.upgradeModal.closeButton}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-    
-    const CameraModal = () => (
-        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 animate-fade-in">
-            <button onClick={closeCamera} className="absolute top-4 right-4 text-white/70 hover:text-white text-4xl font-bold z-10" aria-label={t.closeCamera}>
-                &times;
-            </button>
-            <div className="relative w-full max-w-2xl aspect-video bg-black rounded-lg overflow-hidden shadow-2xl border-4 border-white/10">
-                 <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover"></video>
-                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-[90%] h-[90%] border-2 border-dashed border-white/50 rounded-lg"></div>
-                 </div>
-                 <p className="absolute top-4 left-1/2 -translate-x-1/2 text-white bg-black/50 px-3 py-1 rounded-full text-sm">{t.cameraHelperText}</p>
-            </div>
-            <div className="absolute bottom-10 flex justify-center w-full">
-                <button 
-                    onClick={capturePhoto} 
-                    className="w-20 h-20 rounded-full border-4 border-white/50 bg-white/20 p-1 group transition-all duration-200 transform hover:scale-110 focus:outline-none" 
-                    aria-label={t.capture}>
-                    <div className="w-full h-full rounded-full bg-white group-active:bg-gray-300"></div>
-                </button>
-            </div>
-        </div>
-    );
-
     const FeedbackSection = () => (
         <div className="mt-4 text-center">
             <p className="text-sm font-semibold text-text-muted mb-2">{t.feedbackPrompt}</p>
@@ -451,8 +385,24 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
 
     return (
         <div>
-            {isCameraOpen && <CameraModal />}
-            {showUpgradeModal && <UpgradeModal />}
+            <CameraCapture
+                isOpen={isCameraOpen}
+                onClose={() => setIsCameraOpen(false)}
+                onCapture={handleCapture}
+                t={t}
+                helperText={t.cameraHelperText}
+            />
+            {isPaymentModalOpen && (
+                 <PaymentModal 
+                    isOpen={isPaymentModalOpen}
+                    onClose={() => {
+                        setIsPaymentModalOpen(false);
+                        justUpgradedRef.current = false;
+                    }}
+                    onConfirm={handlePaymentSuccess}
+                    t={t}
+                />
+            )}
             <div className="flex justify-between items-center mb-4 border-b-2 border-brand-green/50 pb-3">
                 <h2 className="text-2xl font-bold text-brand-green-dark">{t.scannerTitle}</h2>
                 <button

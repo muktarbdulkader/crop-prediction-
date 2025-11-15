@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import type { User } from '../../types';
+import SelectInput from '../SelectInput';
 
 interface RegisterProps {
   onRegister: (user: Omit<User, 'plan'>) => void;
@@ -11,12 +12,14 @@ const Register: React.FC<RegisterProps> = ({ onRegister, t }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [role, setRole] = useState(t.roleOptions[0]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name && email && password) {
       // In a real app, this would create a new user record.
-      onRegister({ name, email });
+      onRegister({ name, email, phone, role });
     }
   };
 
@@ -36,6 +39,29 @@ const Register: React.FC<RegisterProps> = ({ onRegister, t }) => {
           onChange={(e) => setName(e.target.value)}
           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-brand-green focus:border-brand-green sm:text-sm"
         />
+      </div>
+       <div>
+        <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+          {t.phoneLabel}
+        </label>
+        <input
+          id="phone"
+          name="phone"
+          type="tel"
+          autoComplete="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder={t.phonePlaceholder}
+          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-brand-green focus:border-brand-green sm:text-sm"
+        />
+      </div>
+      <div>
+         <SelectInput 
+            label={t.roleLabel}
+            options={t.roleOptions}
+            value={role}
+            onChange={setRole}
+         />
       </div>
       <div>
         <label htmlFor="email-register" className="block text-sm font-medium text-gray-700">

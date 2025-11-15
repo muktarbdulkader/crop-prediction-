@@ -5,8 +5,8 @@ import Register from './Register';
 import type { User } from '../../types';
 
 interface AuthPageProps {
-  onLogin: (user: User) => void;
-  onRegister: (user: User) => void;
+  onLogin: (user: Omit<User, 'plan'>) => void;
+  onRegister: (user: Omit<User, 'plan'>) => void;
   onBackToLanding: () => void;
   t: any; // Translation object
 }

@@ -3,10 +3,12 @@ export type Language = 'en' | 'am' | 'om';
 export type User = {
   name: string;
   email: string;
+  phone?: string;
+  role: string;
   plan: 'free' | 'pro';
 }
 
-export type Tool = 'predictor' | 'chatbot' | 'scanner' | 'soil_scanner' | 'profile';
+export type Tool = 'predictor' | 'chatbot' | 'scanner' | 'soil_scanner' | 'product_scanner' | 'profile';
 
 export interface PredictionParams {
   rainfall: number;

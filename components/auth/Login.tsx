@@ -18,7 +18,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, t }) => {
       // We'll derive a name from the email for the welcome message.
       const namePart = email.split('@')[0];
       const name = namePart ? namePart.replace(/[^a-zA-Z]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : '';
-      onLogin({ name: name.trim() || t.defaultUsername, email });
+      onLogin({ name: name.trim() || t.defaultUsername, email, role: t.roleOptions[0] });
     }
   };
 

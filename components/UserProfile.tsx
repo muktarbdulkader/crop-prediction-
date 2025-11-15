@@ -2,10 +2,11 @@
 import React, { useState } from 'react';
 import type { User, Language } from '../types';
 import PaymentModal from './PaymentModal';
+import SelectInput from './SelectInput';
 
 interface UserProfileProps {
   user: User;
-  onUpdateUser: (newName: string) => void;
+  onUpdateUser: (details: { name?: string; phone?: string; role?: string; }) => void;
   onUpgrade: () => void;
   language: Language;
   t: any; // Translation object
@@ -13,16 +14,20 @@ interface UserProfileProps {
 
 const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, onUpgrade, t }) => {
   const [newName, setNewName] = useState(user.name);
-  const [nameUpdateSuccess, setNameUpdateSuccess] = useState(false);
+  const [newPhone, setNewPhone] = useState(user.phone || '');
+  const [newRole, setNewRole] = useState(user.role);
+  const [updateSuccess, setUpdateSuccess] = useState(false);
   const [upgradeSuccess, setUpgradeSuccess] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newName.trim() && newName.trim() !== user.name) {
-      onUpdateUser(newName.trim());
-      setNameUpdateSuccess(true);
-      setTimeout(() => setNameUpdateSuccess(false), 3000); // Hide message after 3 seconds
+    const trimmedName = newName.trim();
+    const trimmedPhone = newPhone.trim();
+    if (trimmedName && (trimmedName !== user.name || trimmedPhone !== (user.phone || '') || newRole !== user.role)) {
+      onUpdateUser({ name: trimmedName, phone: trimmedPhone, role: newRole });
+      setUpdateSuccess(true);
+      setTimeout(() => setUpdateSuccess(false), 3000); // Hide message after 3 seconds
     }
   };
   
@@ -33,6 +38,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, onUpgrade
     setTimeout(() => setUpgradeSuccess(false), 4000);
   };
 
+  const hasChanges = newName.trim() !== user.name || newPhone.trim() !== (user.phone || '') || newRole !== user.role;
 
   return (
     <div>
@@ -57,33 +63,52 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, onUpgrade
                     {user.plan === 'pro' ? `⭐ ${t.pro.proTier}` : t.pro.freeTier}
                 </p>
             </div>
-            <div>
-                <label className="block text-sm font-medium text-text-muted">{t.profile.currentName}</label>
-                <p className="mt-1 text-lg text-text-main font-semibold">{user.name}</p>
-            </div>
-            <div>
+             <div>
                 <label className="block text-sm font-medium text-text-muted">{t.profile.currentEmail}</label>
                 <p className="mt-1 text-text-muted">{user.email}</p>
             </div>
-            <div className="pt-4">
-                <label htmlFor="fullName" className="block text-sm font-medium text-text-main">{t.profile.updateNameLabel}</label>
-                <input
-                type="text"
-                id="fullName"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-base-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-brand-green focus:border-brand-green sm:text-sm"
-                />
+            
+            <div className="pt-4 space-y-4">
+                <div>
+                    <label htmlFor="fullName" className="block text-sm font-medium text-text-main">{t.profile.updateNameLabel}</label>
+                    <input
+                        type="text"
+                        id="fullName"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        className="mt-1 form-input"
+                    />
+                </div>
+                 <div>
+                    <label htmlFor="phone" className="block text-sm font-medium text-text-main">{t.profile.updatePhoneLabel}</label>
+                    <input
+                        type="tel"
+                        id="phone"
+                        value={newPhone}
+                        onChange={(e) => setNewPhone(e.target.value)}
+                        placeholder={t.phonePlaceholder}
+                        className="mt-1 form-input"
+                    />
+                </div>
+                <div>
+                    <SelectInput
+                        label={t.profile.updateRoleLabel}
+                        options={t.roleOptions}
+                        value={newRole}
+                        onChange={setNewRole}
+                    />
+                </div>
             </div>
-            <div className="flex items-center gap-4 pt-2">
+
+            <div className="flex items-center gap-4 pt-4">
                 <button
                 type="submit"
                 className="bg-brand-green hover:bg-brand-green-dark text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 disabled:opacity-50"
-                disabled={!newName.trim() || newName.trim() === user.name}
+                disabled={!newName.trim() || !hasChanges}
                 >
                 {t.profile.updateButton}
                 </button>
-                {nameUpdateSuccess && (
+                {updateSuccess && (
                     <p className="text-sm text-green-600 animate-fade-in">{t.profile.updateSuccess}</p>
                 )}
             </div>
