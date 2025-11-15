@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { marked } from 'marked';
@@ -12,13 +11,15 @@ import PredictionCard from './PredictionCard';
 import VisualizationTabs from './VisualizationTabs';
 import PredictionHistory from './PredictionHistory';
 import LoadingIndicator from './LoadingIndicator';
+import PlayAudioButton from './PlayAudioButton';
 
 interface CropPredictorProps {
     language: Language;
     t: any; // Translation object
+    onAskAgriBot: (prompt: string) => void;
 }
 
-const CropPredictor: React.FC<CropPredictorProps> = ({ language, t }) => {
+const CropPredictor: React.FC<CropPredictorProps> = ({ language, t, onAskAgriBot }) => {
   const [params, setParams] = useState<PredictionParams>({
     rainfall: 120,
     temperature: 25,
@@ -29,12 +30,16 @@ const CropPredictor: React.FC<CropPredictorProps> = ({ language, t }) => {
     ph: 6.5,
     soilType: t.soilTypes[0],
     region: t.regions[0],
+    customPrompt: '',
   });
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [showCustomPrompt, setShowCustomPrompt] = useState(false);
 
   const [guide, setGuide] = useState<string | null>(null);
+  const [rawGuide, setRawGuide] = useState<string | null>(null);
   const [isGuideLoading, setIsGuideLoading] = useState<boolean>(false);
   const [guideError, setGuideError] = useState<string | null>(null);
   
@@ -65,6 +70,7 @@ const CropPredictor: React.FC<CropPredictorProps> = ({ language, t }) => {
   // Reset guide when a new prediction is made
   useEffect(() => {
     setGuide(null);
+    setRawGuide(null);
     setGuideError(null);
   }, [prediction]);
 
@@ -147,12 +153,14 @@ const CropPredictor: React.FC<CropPredictorProps> = ({ language, t }) => {
     setIsGuideLoading(true);
     setGuideError(null);
     setGuide(null);
+    setRawGuide(null);
 
     try {
         if (!process.env.API_KEY) throw new Error("API_KEY_MISSING");
         
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const result = await generateFarmingGuide(ai, prediction.crop, params.region, language);
+        setRawGuide(result);
         const htmlResult = await marked.parse(result);
         setGuide(htmlResult);
     } catch (err) {
@@ -167,6 +175,14 @@ const CropPredictor: React.FC<CropPredictorProps> = ({ language, t }) => {
     setHistory([]);
     localStorage.removeItem('predictionHistory');
   };
+
+  const handleAskBot = () => {
+      if (prediction) {
+          const prompt = t.askBotPrompts.crop.replace('{crop}', prediction.crop).replace('{region}', params.region);
+          onAskAgriBot(prompt);
+      }
+  };
+
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -214,6 +230,31 @@ const CropPredictor: React.FC<CropPredictorProps> = ({ language, t }) => {
               <InputSlider label={t.ph} unit="" min={3} max={10} step={0.1} value={params.ph} onChange={(val) => handleParamChange('ph', val)} />
               <SelectInput label={t.soilType} options={t.soilTypes} value={params.soilType} onChange={(val) => handleParamChange('soilType', val)} />
               <SelectInput label={t.region} options={t.regions} value={params.region} onChange={(val) => handleParamChange('region', val)} />
+              
+              <div>
+                <button
+                    type="button"
+                    onClick={() => setShowCustomPrompt(!showCustomPrompt)}
+                    className="text-sm font-semibold text-brand-green hover:underline focus:outline-none flex items-center gap-1"
+                >
+                    {showCustomPrompt ? t.hideCustomPrompt : t.showCustomPrompt}
+                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${showCustomPrompt ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </button>
+                {showCustomPrompt && (
+                    <div className="mt-2 animate-fade-in">
+                        <label htmlFor="customPrompt" className="sr-only">{t.showCustomPrompt}</label>
+                        <textarea
+                            id="customPrompt"
+                            value={params.customPrompt || ''}
+                            onChange={(e) => handleParamChange('customPrompt', e.target.value)}
+                            placeholder={t.customPromptPlaceholder}
+                            className="form-input"
+                            rows={3}
+                        />
+                    </div>
+                )}
+              </div>
+
               <button
                 onClick={handleSubmit}
                 disabled={isLoading}
@@ -234,16 +275,33 @@ const CropPredictor: React.FC<CropPredictorProps> = ({ language, t }) => {
             t={t} 
             onGenerateGuide={handleGenerateGuide}
             isGuideLoading={isGuideLoading}
+            language={language}
            />
         </div>
          {(isGuideLoading || guideError || guide) && (
             <div className="bg-card p-6 rounded-2xl shadow-lg border border-base-200 animate-fade-in">
-                <h2 className="text-2xl font-bold mb-4 text-brand-green-dark">{t.farmingGuideTitle} for {prediction?.crop}</h2>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-2xl font-bold text-brand-green-dark">{t.farmingGuideTitle} for {prediction?.crop}</h2>
+                    {guide && rawGuide && <PlayAudioButton textToRead={rawGuide} language={language} t={t} />}
+                </div>
                 {isGuideLoading && <LoadingIndicator text={t.generatingGuide} />}
                 {guideError && <div className="text-red-600 bg-red-100 p-3 rounded-md">{guideError}</div>}
                 {guide && <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: guide }} />}
             </div>
         )}
+
+        {prediction && !isLoading && (
+            <div className="bg-card p-4 rounded-2xl shadow-lg border border-base-200 text-center animate-fade-in">
+                <button
+                    onClick={handleAskBot}
+                    className="bg-brand-brown/10 text-brand-brown font-semibold py-3 px-6 rounded-lg transition-colors duration-300 hover:bg-brand-brown/20 flex items-center justify-center gap-2 w-full sm:w-auto mx-auto"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                    {t.askBot}
+                </button>
+            </div>
+        )}
+
         <div className="bg-card p-6 rounded-2xl shadow-lg border border-base-200">
             <VisualizationTabs t={t} />
         </div>

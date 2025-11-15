@@ -1,17 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { marked } from 'marked';
-import { analyzeLeaf, generateSpeech, getTreatmentPlan, extractDiseaseName, generateDiseaseImage } from '../services/geminiService';
+import { analyzeLeaf, getTreatmentPlan, extractDiseaseName, generateDiseaseImage, getPlantGrowthStages } from '../services/geminiService';
 import type { Language, User, LeafAnalysisResult, ScanHistoryItem } from '../types';
 import LoadingIndicator from './LoadingIndicator';
 import ExampleCarousel from './ExampleCarousel';
 import ScanHistory from './ScanHistory';
+import PlayAudioButton from './PlayAudioButton';
 
 interface LeafScannerProps {
     language: Language;
     t: any; // Translation object
     user: User;
     onNavigateToProfile: () => void;
+    onAskAgriBot: (prompt: string) => void;
 }
 
 const fileToBase64 = (file: File): Promise<string> =>
@@ -28,7 +30,7 @@ const urlToFile = async (url: string, filename: string, mimeType: string): Promi
     return new File([blob], filename, { type: mimeType });
 };
 
-const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigateToProfile }) => {
+const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigateToProfile, onAskAgriBot }) => {
     const [image, setImage] = useState<{ file: File; dataUrl: string } | null>(null);
     const [plantName, setPlantName] = useState('');
     const [prompt, setPrompt] = useState('');
@@ -43,11 +45,9 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
     const [feedbackGiven, setFeedbackGiven] = useState<'up' | 'down' | null>(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
 
-    const [isAudioLoading, setIsAudioLoading] = useState(false);
-    const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-    
     // State for Pro features
     const [treatmentPlan, setTreatmentPlan] = useState<string | null>(null);
+    const [rawTreatmentPlan, setRawTreatmentPlan] = useState<string | null>(null);
     const [isTreatmentLoading, setIsTreatmentLoading] = useState(false);
     const [treatmentError, setTreatmentError] = useState<string | null>(null);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -55,6 +55,13 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [imageGenError, setImageGenError] = useState<string | null>(null);
     const [showProTooltip, setShowProTooltip] = useState(false);
+
+    // Growth Stages State
+    const [growthStages, setGrowthStages] = useState<string | null>(null);
+    const [rawGrowthStages, setRawGrowthStages] = useState<string | null>(null);
+    const [isGrowthStagesLoading, setIsGrowthStagesLoading] = useState(false);
+    const [growthStagesError, setGrowthStagesError] = useState<string | null>(null);
+
 
     // Scan History State
     const [history, setHistory] = useState<ScanHistoryItem[]>(() => {
@@ -67,6 +74,8 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
         }
     });
     const [showHistory, setShowHistory] = useState(false);
+    const [activeScanId, setActiveScanId] = useState<string | null>(null);
+    const [showPromptInput, setShowPromptInput] = useState(false);
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -76,8 +85,11 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
     }, [t.scanner?.defaultPrompt, language]);
     
     useEffect(() => {
-        const generateImage = async () => {
-            if (analysis?.raw && user.plan === 'pro' && plantName) {
+        const generateProFeatures = async () => {
+            if (!analysis?.raw || !plantName) return;
+
+            // Image Generation (Pro)
+            if (user.plan === 'pro') {
                 setIsGeneratingImage(true);
                 setGeneratedImageUrl(null);
                 setImageGenError(null);
@@ -100,9 +112,28 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
                     setIsGeneratingImage(false);
                 }
             }
+
+            // Growth Stages (All users)
+            setIsGrowthStagesLoading(true);
+            setGrowthStages(null);
+            setRawGrowthStages(null);
+            setGrowthStagesError(null);
+            try {
+                if (!process.env.API_KEY) throw new Error("API_KEY_MISSING");
+                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                const result = await getPlantGrowthStages(ai, plantName, language);
+                setRawGrowthStages(result);
+                const htmlResult = await marked.parse(result);
+                setGrowthStages(htmlResult);
+            } catch (err) {
+                 const errorMessage = err instanceof Error ? err.message : 'UNKNOWN_ERROR';
+                 setGrowthStagesError(t.errors[errorMessage] || t.errors.UNKNOWN_ERROR);
+            } finally {
+                setIsGrowthStagesLoading(false);
+            }
         };
 
-        generateImage();
+        generateProFeatures();
     }, [analysis, user.plan, plantName, language, t.errors]);
 
     useEffect(() => {
@@ -201,9 +232,13 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
         setAnalysis(null);
         setFeedbackGiven(null);
         setTreatmentPlan(null);
+        setRawTreatmentPlan(null);
         setTreatmentError(null);
         setGeneratedImageUrl(null);
         setImageGenError(null);
+        setGrowthStages(null);
+        setRawGrowthStages(null);
+        setGrowthStagesError(null);
 
         try {
             if (!process.env.API_KEY) throw new Error("API_KEY_MISSING");
@@ -224,6 +259,7 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
                 analysis: { raw: result.analysis, confidence: result.confidence },
                 timestamp: new Date().toISOString(),
             };
+            setActiveScanId(newHistoryItem.id);
             const updatedHistory = [newHistoryItem, ...history].slice(0, 30);
             setHistory(updatedHistory);
             localStorage.setItem('scanHistory', JSON.stringify(updatedHistory));
@@ -271,12 +307,24 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
         setIsTreatmentLoading(true);
         setTreatmentError(null);
         setTreatmentPlan(null);
+        setRawTreatmentPlan(null);
         try {
             if (!process.env.API_KEY) throw new Error("API_KEY_MISSING");
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const result = await getTreatmentPlan(ai, analysis.raw, language);
+            setRawTreatmentPlan(result);
             const htmlResult = await marked.parse(result);
             setTreatmentPlan(htmlResult);
+
+            // Save treatment plan to the correct history item
+            if (activeScanId) {
+                const updatedHistory = history.map(scan => 
+                    scan.id === activeScanId ? { ...scan, treatmentPlan: result } : scan
+                );
+                setHistory(updatedHistory);
+                localStorage.setItem('scanHistory', JSON.stringify(updatedHistory));
+            }
+
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'UNKNOWN_ERROR';
             setTreatmentError(t.errors[errorMessage] || t.errors.UNKNOWN_ERROR);
@@ -285,40 +333,23 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
         }
     }
 
-    const handlePlayAudio = async () => {
-        if (!analysis?.raw || isPlayingAudio || isAudioLoading) return;
-        setIsAudioLoading(true);
-        try {
-            if (!process.env.API_KEY) throw new Error("API_KEY_MISSING");
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const audioBuffer = await generateSpeech(ai, analysis.raw);
-            
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const source = audioContext.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(audioContext.destination);
-            source.start();
-            setIsPlayingAudio(true);
-            source.onended = () => setIsPlayingAudio(false);
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'UNKNOWN_ERROR';
-            setError(t.errors[errorMessage] || t.errors.UNKNOWN_ERROR);
-        } finally {
-            setIsAudioLoading(false);
-        }
-    };
-
     const handleResetScanner = (clearImage: boolean = true) => {
         if (clearImage) setImage(null);
         setAnalysis(null);
         setError(null);
         setFeedbackGiven(null);
         setTreatmentPlan(null);
+        setRawTreatmentPlan(null);
         setTreatmentError(null);
         setGeneratedImageUrl(null);
         setImageGenError(null);
+        setGrowthStages(null);
+        setRawGrowthStages(null);
+        setGrowthStagesError(null);
         setPlantName('');
         setShowHistory(false);
+        setActiveScanId(null);
+        setShowPromptInput(false);
     };
 
     const handleClearHistory = () => {
@@ -334,12 +365,35 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
         setImage({ file: new File([], "history.jpg"), dataUrl: item.imageDataUrl });
         setPlantName(item.plantName);
         setAnalysis({ html: htmlAnalysis, raw: item.analysis.raw, confidence: item.analysis.confidence });
-        if(htmlTreatment) setTreatmentPlan(htmlTreatment);
+        if(htmlTreatment) {
+            setRawTreatmentPlan(item.treatmentPlan);
+            setTreatmentPlan(htmlTreatment);
+        }
         if(item.generatedImageUrl) setGeneratedImageUrl(item.generatedImageUrl);
+        setActiveScanId(item.id);
         setShowHistory(false);
     };
+
+    const handleAskBot = async () => {
+        if (analysis?.raw && plantName) {
+            try {
+                if (!process.env.API_KEY) throw new Error("API_KEY_MISSING");
+                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                const diseaseName = await extractDiseaseName(ai, analysis.raw, language);
+                const prompt = t.askBotPrompts.leaf
+                    .replace('{disease}', diseaseName || t.askBotPrompts.leafIssueFallback)
+                    .replace('{plant}', plantName);
+                onAskAgriBot(prompt);
+            } catch (err) {
+                 // Fallback to a generic prompt if extraction fails
+                const prompt = t.askBotPrompts.leaf
+                    .replace('{disease}', t.askBotPrompts.leafIssueFallback)
+                    .replace('{plant}', plantName);
+                onAskAgriBot(prompt);
+            }
+        }
+    };
     
-    // Fix: Implement UpgradeModal component
     const UpgradeModal = () => (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowUpgradeModal(false)}>
             <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full text-center relative" onClick={(e) => e.stopPropagation()}>
@@ -356,22 +410,30 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
             </div>
         </div>
     );
-    // Fix: Implement CameraModal component
+    
     const CameraModal = () => (
         <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 animate-fade-in">
             <button onClick={closeCamera} className="absolute top-4 right-4 text-white/70 hover:text-white text-4xl font-bold z-10" aria-label={t.closeCamera}>
                 &times;
             </button>
-            <div className="relative w-full max-w-2xl aspect-[4/3] bg-black rounded-lg overflow-hidden shadow-2xl">
+            <div className="relative w-full max-w-2xl aspect-video bg-black rounded-lg overflow-hidden shadow-2xl border-4 border-white/10">
                  <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover"></video>
+                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-[90%] h-[90%] border-2 border-dashed border-white/50 rounded-lg"></div>
+                 </div>
+                 <p className="absolute top-4 left-1/2 -translate-x-1/2 text-white bg-black/50 px-3 py-1 rounded-full text-sm">{t.cameraHelperText}</p>
             </div>
             <div className="absolute bottom-10 flex justify-center w-full">
-                <button onClick={capturePhoto} className="w-20 h-20 rounded-full border-4 border-white/80 bg-transparent hover:border-white transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-black/50 focus:ring-white" aria-label={t.capture}>
+                <button 
+                    onClick={capturePhoto} 
+                    className="w-20 h-20 rounded-full border-4 border-white/50 bg-white/20 p-1 group transition-all duration-200 transform hover:scale-110 focus:outline-none" 
+                    aria-label={t.capture}>
+                    <div className="w-full h-full rounded-full bg-white group-active:bg-gray-300"></div>
                 </button>
             </div>
         </div>
     );
-    // Fix: Implement FeedbackSection component
+
     const FeedbackSection = () => (
         <div className="mt-4 text-center">
             <p className="text-sm font-semibold text-text-muted mb-2">{t.feedbackPrompt}</p>
@@ -463,14 +525,24 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
                                         />
                                     </div>
                                     <div>
-                                        <label htmlFor="prompt" className="block text-sm font-medium text-text-muted mb-2">{t.analysisPrompt}</label>
-                                        <textarea
-                                            id="prompt"
-                                            rows={3}
-                                            value={prompt}
-                                            onChange={(e) => setPrompt(e.target.value)}
-                                            className="form-input"
-                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPromptInput(!showPromptInput)}
+                                            className="text-sm font-semibold text-brand-green hover:underline focus:outline-none flex items-center gap-1 mb-2"
+                                        >
+                                            {showPromptInput ? t.hideCustomAnalysis : t.showCustomAnalysis}
+                                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${showPromptInput ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                        </button>
+                                        {showPromptInput && (
+                                            <textarea
+                                                id="prompt"
+                                                rows={3}
+                                                value={prompt}
+                                                onChange={(e) => setPrompt(e.target.value)}
+                                                placeholder={t.scanner.defaultPrompt}
+                                                className="form-input animate-fade-in"
+                                            />
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -496,31 +568,25 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
                         {/* Right Column: Results */}
                         <div className="space-y-4">
                            <div className="bg-card border border-base-200 p-4 rounded-lg min-h-[200px] flex flex-col shadow-lg">
-                                <div className="flex justify-between items-center mb-2">
+                                <div className="flex justify-between items-start mb-2">
                                     <h3 className="text-xl font-bold text-brand-green-dark">{t.analysisResult}</h3>
-                                    {analysis && (
-                                        <div className="text-right">
-                                            <p className="text-sm font-semibold text-text-muted">{t.confidenceScore}</p>
-                                            <p className="font-bold text-lg text-brand-green">{analysis.confidence.toFixed(1)}%</p>
-                                        </div>
-                                    )}
+                                    <div className="flex items-center gap-4">
+                                        {analysis && (
+                                            <PlayAudioButton textToRead={analysis.raw} language={language} t={t} />
+                                        )}
+                                        {analysis && (
+                                            <div className="text-right">
+                                                <p className="text-sm font-semibold text-text-muted">{t.confidenceScore}</p>
+                                                <p className="font-bold text-lg text-brand-green">{analysis.confidence.toFixed(1)}%</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="flex-grow overflow-y-auto pr-2">
                                     {isLoading && <LoadingIndicator text={t.aiInspecting} />}
                                     {error && <div className="text-red-600 bg-red-100 p-3 rounded-md">{error}</div>}
                                     {analysis && (
-                                        <div className="relative">
-                                            <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: analysis.html }} />
-                                            <button onClick={handlePlayAudio} disabled={isAudioLoading || isPlayingAudio} className="absolute top-0 right-0 p-1.5 rounded-full bg-card shadow-md text-text-muted hover:bg-base-200 disabled:opacity-50">
-                                                {isAudioLoading ? (
-                                                    <div className="w-5 h-5 animate-spin rounded-full border-2 border-brand-green border-t-transparent"></div>
-                                                ) : (
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                        </div>
+                                        <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: analysis.html }} />
                                     )}
                                     {!analysis && !isLoading && !error && (
                                         <div className="text-center text-text-muted pt-10">
@@ -530,6 +596,18 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
                                 </div>
                                 {analysis && !isLoading && <FeedbackSection />}
                            </div>
+
+                           {analysis && !isLoading && plantName && (
+                            <div className="bg-card border border-base-200 p-4 rounded-lg animate-fade-in shadow-lg">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="text-xl font-bold text-brand-green-dark">{t.plantGrowthStages.title} for {plantName}</h3>
+                                    {growthStages && rawGrowthStages && <PlayAudioButton textToRead={rawGrowthStages} language={language} t={t} />}
+                                </div>
+                                {isGrowthStagesLoading && <LoadingIndicator text={t.plantGrowthStages.loading} />}
+                                {growthStagesError && <div className="text-red-600 bg-red-100 p-3 rounded-md">{growthStagesError}</div>}
+                                {growthStages && <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: growthStages }} />}
+                            </div>
+                           )}
                            
                            {user.plan === 'pro' && analysis && !isLoading && (
                             <div className="bg-card border border-base-200 p-4 rounded-lg animate-fade-in shadow-lg relative">
@@ -562,7 +640,10 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
                            
                            {analysis && !isLoading && (
                                 <div className="bg-card border border-base-200 p-4 rounded-lg animate-fade-in shadow-lg">
-                                    <h3 className="text-xl font-bold text-brand-green-dark mb-3">{t.treatmentPlanTitle}</h3>
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h3 className="text-xl font-bold text-brand-green-dark">{t.treatmentPlanTitle}</h3>
+                                        {treatmentPlan && rawTreatmentPlan && <PlayAudioButton textToRead={rawTreatmentPlan} language={language} t={t} />}
+                                    </div>
                                     {isTreatmentLoading && <LoadingIndicator text={t.generatingTreatment} />}
                                     {treatmentError && <div className="text-red-600 bg-red-100 p-3 rounded-md">{treatmentError}</div>}
                                     {treatmentPlan && <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: treatmentPlan }} />}
@@ -579,6 +660,19 @@ const LeafScanner: React.FC<LeafScannerProps> = ({ language, t, user, onNavigate
                                     )}
                                 </div>
                            )}
+
+                           {analysis && !isLoading && (
+                                <div className="bg-card p-4 rounded-2xl shadow-lg border border-base-200 text-center animate-fade-in">
+                                    <button
+                                        onClick={handleAskBot}
+                                        className="bg-brand-brown/10 text-brand-brown font-semibold py-3 px-6 rounded-lg transition-colors duration-300 hover:bg-brand-brown/20 flex items-center justify-center gap-2 w-full sm:w-auto mx-auto"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                        {t.askBot}
+                                    </button>
+                                </div>
+                            )}
+
                         </div>
                     </div>
                 </>

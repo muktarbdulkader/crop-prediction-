@@ -1,7 +1,7 @@
-
 import React from 'react';
-import type { PredictionResult } from '../types';
+import type { PredictionResult, Language } from '../types';
 import LoadingIndicator from './LoadingIndicator';
+import PlayAudioButton from './PlayAudioButton';
 
 interface PredictionCardProps {
   prediction: PredictionResult | null;
@@ -10,9 +10,10 @@ interface PredictionCardProps {
   t: any; // Translation object
   onGenerateGuide: () => void;
   isGuideLoading: boolean;
+  language: Language;
 }
 
-const PredictionCard: React.FC<PredictionCardProps> = ({ prediction, isLoading, error, t, onGenerateGuide, isGuideLoading }) => {
+const PredictionCard: React.FC<PredictionCardProps> = ({ prediction, isLoading, error, t, onGenerateGuide, isGuideLoading, language }) => {
   if (isLoading) {
     return <LoadingIndicator text={t.analyzingButton} />;
   }
@@ -66,8 +67,23 @@ const PredictionCard: React.FC<PredictionCardProps> = ({ prediction, isLoading, 
             )}
         </div>
 
-      <div className="mt-6 text-left bg-base-100 p-4 rounded-lg border border-base-200">
-        <h4 className="font-bold text-brand-green-dark">{t.justification}:</h4>
+        {prediction.marketDemand && (
+             <div className="mt-4 text-left bg-base-100 p-4 rounded-lg">
+                <div className="flex items-center gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-brand-green" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg>
+                     <div>
+                        <h4 className="font-semibold text-text-muted">{t.marketDemand}</h4>
+                        <p className="text-md font-semibold text-text-main">{prediction.marketDemand}</p>
+                    </div>
+                </div>
+            </div>
+        )}
+
+      <div className="mt-4 text-left bg-base-100 p-4 rounded-lg border border-base-200">
+        <div className="flex justify-between items-center">
+            <h4 className="font-bold text-brand-green-dark">{t.justification}:</h4>
+            <PlayAudioButton textToRead={prediction.reason} language={language} t={t} />
+        </div>
         <p className="text-text-muted mt-1">{prediction.reason}</p>
       </div>
 

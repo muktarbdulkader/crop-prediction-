@@ -4,10 +4,12 @@ import { marked } from 'marked';
 import { analyzeSoil } from '../services/geminiService';
 import type { Language } from '../types';
 import LoadingIndicator from './LoadingIndicator';
+import PlayAudioButton from './PlayAudioButton';
 
 interface SoilScannerProps {
     language: Language;
     t: any; // Translation object
+    onAskAgriBot: (prompt: string) => void;
 }
 
 const fileToBase64 = (file: File): Promise<string> =>
@@ -18,14 +20,16 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.onerror = (error) => reject(error);
   });
 
-const SoilScanner: React.FC<SoilScannerProps> = ({ language, t }) => {
+const SoilScanner: React.FC<SoilScannerProps> = ({ language, t, onAskAgriBot }) => {
     const [image, setImage] = useState<{ file: File; previewUrl: string } | null>(null);
     const [prompt, setPrompt] = useState('');
     const [analysis, setAnalysis] = useState<string | null>(null);
+    const [rawAnalysis, setRawAnalysis] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [showPromptInput, setShowPromptInput] = useState(false);
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -48,6 +52,7 @@ const SoilScanner: React.FC<SoilScannerProps> = ({ language, t }) => {
                 const previewUrl = URL.createObjectURL(file);
                 setImage({ file, previewUrl });
                 setAnalysis(null);
+                setRawAnalysis(null);
                 setError(null);
                 setPrompt(t.soilScannerDefaultPrompt || 'Provide a full analysis of this soil.');
             } else {
@@ -131,6 +136,7 @@ const SoilScanner: React.FC<SoilScannerProps> = ({ language, t }) => {
         setIsLoading(true);
         setError(null);
         setAnalysis(null);
+        setRawAnalysis(null);
 
         try {
             if (!process.env.API_KEY) {
@@ -140,6 +146,7 @@ const SoilScanner: React.FC<SoilScannerProps> = ({ language, t }) => {
             const imageBase64 = await fileToBase64(image.file);
             const userPrompt = prompt || t.soilScannerDefaultPrompt;
             const result = await analyzeSoil(ai, imageBase64, image.file.type, userPrompt, language);
+            setRawAnalysis(result);
             const htmlResult = await marked.parse(result);
             setAnalysis(htmlResult);
         } catch (err) {
@@ -153,7 +160,13 @@ const SoilScanner: React.FC<SoilScannerProps> = ({ language, t }) => {
     const handleResetScanner = () => {
         setImage(null);
         setAnalysis(null);
+        setRawAnalysis(null);
         setError(null);
+        setShowPromptInput(false);
+    };
+
+    const handleAskBot = () => {
+        onAskAgriBot(t.askBotPrompts.soil);
     };
 
     const CameraModal: React.FC = () => (
@@ -165,15 +178,20 @@ const SoilScanner: React.FC<SoilScannerProps> = ({ language, t }) => {
             >
                 &times;
             </button>
-            <div className="relative w-full max-w-2xl aspect-[4/3] bg-black rounded-lg overflow-hidden shadow-2xl">
+             <div className="relative w-full max-w-2xl aspect-video bg-black rounded-lg overflow-hidden shadow-2xl border-4 border-white/10">
                  <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover"></video>
+                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-[90%] h-[90%] border-2 border-dashed border-white/50 rounded-lg"></div>
+                 </div>
+                 <p className="absolute top-4 left-1/2 -translate-x-1/2 text-white bg-black/50 px-3 py-1 rounded-full text-sm">{t.cameraHelperText}</p>
             </div>
             <div className="absolute bottom-10 flex justify-center w-full">
                 <button
                     onClick={capturePhoto}
-                    className="w-20 h-20 rounded-full border-4 border-white/80 bg-transparent hover:border-white transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-black/50 focus:ring-white"
+                    className="w-20 h-20 rounded-full border-4 border-white/50 bg-white/20 p-1 group transition-all duration-200 transform hover:scale-110 focus:outline-none"
                     aria-label={t.capture}
                 >
+                    <div className="w-full h-full rounded-full bg-white group-active:bg-gray-300"></div>
                 </button>
             </div>
         </div>
@@ -229,14 +247,24 @@ const SoilScanner: React.FC<SoilScannerProps> = ({ language, t }) => {
                     {image && (
                          <div className="animate-fade-in space-y-4">
                             <div>
-                                <label htmlFor="prompt" className="block text-sm font-medium text-text-muted mb-2">{t.soilAnalysisPrompt}</label>
-                                <textarea
-                                    id="prompt"
-                                    rows={2}
-                                    value={prompt}
-                                    onChange={(e) => setPrompt(e.target.value)}
-                                    className="form-input"
-                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPromptInput(!showPromptInput)}
+                                    className="text-sm font-semibold text-brand-green hover:underline focus:outline-none flex items-center gap-1 mb-2"
+                                >
+                                    {showPromptInput ? t.hideCustomAnalysis : t.showCustomAnalysis}
+                                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${showPromptInput ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                                {showPromptInput && (
+                                     <textarea
+                                        id="prompt"
+                                        rows={2}
+                                        value={prompt}
+                                        onChange={(e) => setPrompt(e.target.value)}
+                                        placeholder={t.soilAnalysisPrompt}
+                                        className="form-input animate-fade-in"
+                                    />
+                                )}
                             </div>
                          </div>
                     )}
@@ -262,6 +290,7 @@ const SoilScanner: React.FC<SoilScannerProps> = ({ language, t }) => {
                     <div className="bg-card border border-base-200 p-4 rounded-lg min-h-[200px] flex flex-col shadow-lg">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="text-xl font-bold text-brand-green-dark">{t.soilAnalysisResult}</h3>
+                            {analysis && rawAnalysis && <PlayAudioButton textToRead={rawAnalysis} language={language} t={t} />}
                         </div>
                         <div className="flex-grow overflow-y-auto pr-2">
                             {isLoading && <LoadingIndicator text={t.aiAnalyzingSoil} />}
@@ -274,6 +303,18 @@ const SoilScanner: React.FC<SoilScannerProps> = ({ language, t }) => {
                             )}
                         </div>
                     </div>
+
+                    {analysis && !isLoading && (
+                        <div className="bg-card p-4 rounded-2xl shadow-lg border border-base-200 text-center animate-fade-in">
+                            <button
+                                onClick={handleAskBot}
+                                className="bg-brand-brown/10 text-brand-brown font-semibold py-3 px-6 rounded-lg transition-colors duration-300 hover:bg-brand-brown/20 flex items-center justify-center gap-2 w-full sm:w-auto mx-auto"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                {t.askBot}
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

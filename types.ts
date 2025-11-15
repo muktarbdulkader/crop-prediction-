@@ -1,17 +1,12 @@
-export type Language = "en" | "am" | "om";
+export type Language = 'en' | 'am' | 'om';
 
 export type User = {
   name: string;
   email: string;
-  plan: "free" | "pro";
-};
+  plan: 'free' | 'pro';
+}
 
-export type Tool =
-  | "predictor"
-  | "chatbot"
-  | "scanner"
-  | "soil_scanner"
-  | "profile";
+export type Tool = 'predictor' | 'chatbot' | 'scanner' | 'soil_scanner' | 'profile';
 
 export interface PredictionParams {
   rainfall: number;
@@ -23,6 +18,7 @@ export interface PredictionParams {
   ph: number;
   soilType: string;
   region: string;
+  customPrompt?: string;
 }
 
 export interface PredictionResult {
@@ -30,10 +26,12 @@ export interface PredictionResult {
   reason: string;
   confidence: number;
   expectedYield?: string;
+  marketDemand?: string;
 }
 
 export interface ChatMessage {
-  role: "user" | "model";
+  id: string;
+  role: 'user' | 'model';
   text: string;
   isError?: boolean;
 }
@@ -51,14 +49,20 @@ export interface PredictionHistoryItem {
 }
 
 export interface ScanHistoryItem {
-  id: string;
-  imageDataUrl: string; // base64 encoded image
-  plantName: string;
-  analysis: {
-    raw: string;
-    confidence: number;
-  };
-  treatmentPlan?: string; // Storing raw markdown
-  generatedImageUrl?: string;
-  timestamp: string;
+    id: string;
+    imageDataUrl: string; // base64 encoded image
+    plantName: string;
+    analysis: {
+        raw: string;
+        confidence: number;
+    };
+    treatmentPlan?: string; // Storing raw markdown
+    generatedImageUrl?: string;
+    timestamp: string;
 }
+
+// Add a new type for translation strings to include stopAudio
+export type TranslationSet = {
+    [key: string]: any;
+    stopAudio: string;
+};
