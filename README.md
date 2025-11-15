@@ -1,4 +1,5 @@
 # Agricultural Assistant (Agri‑AI)
+view on this link :https://croppredicti.netlify.app/
 
 An AI-powered agricultural assistant that helps farmers and agronomists (especially in Ethiopia) make better decisions about crops and plant health.
 
