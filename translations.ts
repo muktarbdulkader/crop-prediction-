@@ -708,7 +708,7 @@ export const translations = {
     },
 
     // Crop Predictor
-    inputParams: 'Paramമീ터ii Galtee',
+    inputParams: 'fakkeny kana Galtee',
     rainfall: 'Rooba (mm)',
     temperature: 'Hoo\'a (°C)',
     humidity: 'Jiidha (%)',
@@ -883,7 +883,7 @@ export const translations = {
     },
 
     // Pro Plan & Upgrades
-    proBadge: '⭐ PRO',
+    proBadge: '⭐ kafali',
     proFeatures: {
         title: 'bakka kafalti  Bani',
         upgradeButton: 'Gara kafalti  tti Guddisi',
@@ -895,7 +895,7 @@ export const translations = {
     },
     
     pro: {
-        title: 'Gara Agri-AI Pro tti Guddisi',
+        title: 'Gara Agri-AI kafalti tti Guddisi',
         description: 'Amaloota sadarkaa olaanaa banaa gochuun gargaaraa Agri-AI irraa faayidaa guddaa argadhu.',
         feature1: 'Karoora yaalaa dhukkuboota biqiltuu gadi fageenyaan.',
         feature2: 'Deeggarsa dursi kennamuuf.',
@@ -912,7 +912,7 @@ export const translations = {
     payment: {
         title: 'Guddina Kee Xumuri',
         price: '100 ETB / Ji`aan',
-        instructions: 'Gara Pro tti guddisuuf, kaffaltii Telebirr fayyadamuun xumuri.',
+        instructions: 'Gara kafaltitt tti guddisuuf, kaffaltii Telebirr fayyadamuun xumuri.',
         scanQR: 'Koodii QR armaan gadii sakatta\'i ykn appii Telebirr keessatti filannoo Kaffaltii Bilii fayyadami.',
         paybillNumber: 'Lakk. Bilii Kaffaltii: +251916662982',
         transactionIdLabel: 'ID kafalti  Telebirr Kee Galchi',
